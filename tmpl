@@ -1,0 +1,15 @@
+#!/bin/bash
+
+TEMPLATE="$1"
+export NAME="$2"
+EXT="$3"
+
+FILENAME="$NAME.$EXT"
+
+if test -f "$FILENAME"; then
+    echo "$FILENAME already exists"
+    exit 2
+fi
+
+cat ~/.templates/$TEMPLATE.mo | mo > "$FILENAME"
+

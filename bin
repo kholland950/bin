@@ -1,0 +1,110 @@
+#!/bin/bash
+
+STYLE='''
+<style>
+body {
+	background-color: #333;
+	color: white;
+}
+h1 {
+	color: white;
+	font-size: 1em;
+	font-family: sans-serif;
+	padding: .2em;
+	font-color: #444;
+}
+</style>
+'''
+
+HEAD="""<html>
+	<head>
+	<link rel='stylesheet'
+		  href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.8/styles/default.min.css'>
+	<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.8/styles/agate.min.css'>
+	$STYLE
+	</head>
+	<body>"""
+
+BEFORE='''
+	<pre><code>'''
+
+AFTER='''
+	</code></pre>
+	<script src="/static/highlight.pack.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
+
+	</body>
+	</html>'''
+
+HTML_ENCODE='s/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+
+urlencode() {
+    # urlencode <string>
+    old_lc_collate=$LC_COLLATE
+    LC_COLLATE=C
+    
+    local length="${#1}"
+    for (( i = 0; i < length; i++ )); do
+        local c="${1:i:1}"
+        case $c in
+            [a-zA-Z0-9.~_-]) printf "$c" ;;
+            *) printf '%%%02X' "'$c" ;;
+        esac
+    done
+    
+    LC_COLLATE=$old_lc_collate
+}
+
+# Copy and paste, linux and macos
+if command_exists xclip > /dev/null 2>&1; then
+    COPY='xclip -selection clipboard'
+    PASTE='xclip -selection clipboard -o'
+else
+    COPY='pbcopy'
+    PASTE='pbpaste'
+fi
+
+LOCAL_DIR=~/.pastes
+RAW_DIR=raw
+mkdir $LOCAL_DIR > /dev/null 2>&1
+mkdir $LOCAL_DIR/$RAW_DIR > /dev/null 2>&1
+
+if [ $# -eq 0 ]; then
+	# paste from clipboard
+	NAME=paste-$RANDOM
+	FN=$LOCAL_DIR/$NAME
+	RAWFN=$LOCAL_DIR/$RAW_DIR/$NAME
+	echo $HEAD > $FN
+	echo $BEFORE >> $FN
+	eval $PASTE > $RAWFN
+	eval $PASTE | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' >> $FN
+	echo $AFTER >> $FN
+else
+	# paste from file
+	NAME=$(basename $1)
+	FN=$LOCAL_DIR/$NAME
+	RAWFN=$LOCAL_DIR/$RAW_DIR/$NAME
+
+	# copy raw file
+	cp $1 $LOCAL_DIR/$RAW_DIR
+
+	echo $HEAD > $FN
+	echo "<h1>$(basename $1)</h1>" >> $FN
+	echo $BEFORE >> $FN
+	cat $1 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' >> $FN
+	echo $AFTER >> $FN
+fi
+
+BASENAME=$(basename $FN)
+
+TARGET_HOST=aster.host
+TARGET_USER=bskcx
+TARGET_DIR=/srv/http/prophet
+TARGET_SCP_PORT=56123
+BASE_URL=https://aster.host/prophet/
+
+scp -P $TARGET_SCP_PORT "$FN" $TARGET_USER@$TARGET_HOST:$TARGET_DIR > /dev/null 2>&1
+scp -P $TARGET_SCP_PORT "$RAWFN" $TARGET_USER@$TARGET_HOST:$TARGET_DIR/$RAW_DIR > /dev/null 2>&1
+URL=$BASE_URL$(urlencode "$BASENAME")
+echo $URL | eval $COPY
+echo $URL copied to clipboard
