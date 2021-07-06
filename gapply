@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+git stash apply $(git stash list | grep "zsh_stash_name_$1" | cut -d: -f1)
+
