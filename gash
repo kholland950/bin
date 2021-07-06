@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+git stash push -m "gash_$1"
+
